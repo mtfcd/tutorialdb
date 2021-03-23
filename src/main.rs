@@ -1,4 +1,7 @@
-use std::{io::{self, Write}, process};
+use std::{
+    io::{self, Write},
+    process,
+};
 
 fn main() {
     loop {
@@ -43,7 +46,7 @@ fn print_prompt() {
 
 enum MetaCommandResult {
     MetaCommandSuccess,
-    MetaCommandUnrecognizedCommand
+    MetaCommandUnrecognizedCommand,
 }
 
 fn do_meta_command(input: &str) -> MetaCommandResult {
@@ -51,36 +54,36 @@ fn do_meta_command(input: &str) -> MetaCommandResult {
         ".exit" => {
             process::exit(0);
         }
-        _ => return MetaCommandResult::MetaCommandUnrecognizedCommand
+        _ => return MetaCommandResult::MetaCommandUnrecognizedCommand,
     }
 }
 
 enum StatementType {
     StatementInsert,
-    StatementSelect
+    StatementSelect,
 }
 
 enum PrepareResult {
     PrepareSuccess(StatementType),
-    PrepareUnRecognizedStatement
+    PrepareUnRecognizedStatement,
 }
 
 fn prepare_statement(input: &str) -> PrepareResult {
     if input.starts_with("insert") {
-        return PrepareResult::PrepareSuccess(StatementType::StatementInsert)
+        return PrepareResult::PrepareSuccess(StatementType::StatementInsert);
     }
     if input == "select" {
-        return PrepareResult::PrepareSuccess(StatementType::StatementSelect)
+        return PrepareResult::PrepareSuccess(StatementType::StatementSelect);
     }
 
-    return PrepareResult::PrepareUnRecognizedStatement
+    return PrepareResult::PrepareUnRecognizedStatement;
 }
 
 fn execute_statement(statement: StatementType) {
     match statement {
         StatementType::StatementInsert => {
             println!("execute insert");
-        },
+        }
         StatementType::StatementSelect => {
             println!("execute select");
         }
