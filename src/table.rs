@@ -88,7 +88,7 @@ impl Table {
         }
 
         let offset: usize = row_num % ROWS_PER_PAGE;
-        &mut self.pages[page_num][offset..ROW_SIZE]
+        &mut self.pages[page_num][(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
     }
 
     pub fn is_full(&self) -> bool {
