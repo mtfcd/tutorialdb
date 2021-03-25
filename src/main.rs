@@ -100,7 +100,7 @@ fn execute_statement(statement: StatementType, tbl: &mut table::Table) {
             };
         }
         StatementType::StatementSelect => {
-            println!("execute select");
+            tbl.select();
         }
     }
 }

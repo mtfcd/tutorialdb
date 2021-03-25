@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 const ID_SIZE: usize = 4;
 const USERNAME_SIZE: usize = 32;
 const EMAIL_SIZE: usize = 255;
@@ -56,6 +58,13 @@ impl Row {
         string2arr(&self.username, &mut slot[USERNAME_OFFSET..EMAIL_OFFSET]);
         string2arr(&self.email, &mut slot[EMAIL_OFFSET..]);
     }
+
+    pub fn deserialize(slot: &mut [u8]) -> Self {
+        let id = u32::from_le_bytes(slot[ID_OFFSET..USERNAME_OFFSET].try_into().unwrap());
+        let username = String::from_utf8(slot[USERNAME_OFFSET..EMAIL_OFFSET].to_owned()).unwrap();
+        let email = String::from_utf8(slot[EMAIL_OFFSET..].to_owned()).unwrap();
+        Row {id, username, email}
+    }
 }
 
 fn string2arr(s: &String, arr: &mut [u8]) {
@@ -72,13 +81,13 @@ impl Table {
         }
     }
 
-    pub fn row_slot(&mut self) -> &mut [u8] {
-        let page_num = self.num_rows / ROWS_PER_PAGE;
+    pub fn row_slot(&mut self, row_num: usize) -> &mut [u8] {
+        let page_num = row_num / ROWS_PER_PAGE;
         if let None = self.pages.get(page_num) {
             self.pages.push(vec![0; PAGE_SIZE]);
         }
 
-        let offset: usize = self.num_rows % ROWS_PER_PAGE;
+        let offset: usize = row_num % ROWS_PER_PAGE;
         &mut self.pages[page_num][offset..ROW_SIZE]
     }
 
@@ -90,9 +99,17 @@ impl Table {
         if self.is_full() {
             return ExecuteResult::ExecuteTableFull;
         }
-        row.serialize(self.row_slot());
+        row.serialize(self.row_slot(self.num_rows));
         self.num_rows += 1;
         return ExecuteResult::ExecuteSuccess;
+    }
+
+    pub fn select(&mut self) {
+        for i in 0..self.num_rows {
+            let row_slot = self.row_slot(i);
+            let row = Row::deserialize(row_slot);
+            println!("({}, {}, {})", row.id, row.username, row.email);
+        }
     }
 }
 
