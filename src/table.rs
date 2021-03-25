@@ -14,8 +14,8 @@ const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
 #[derive(Debug)]
 pub struct Row {
     id: u32,
-    username: [u8; USERNAME_SIZE], // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
-    email: [u8; EMAIL_SIZE],
+    username: String, // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
+    email: String,
 }
 
 pub struct Table {
@@ -35,14 +35,12 @@ impl Row {
             },
             None => return Err(()),
         };
-        let mut username = [0; 32];
-        match iter.next() {
-            Some(name_str) => str2arr(name_str, &mut username),
+        let username = match iter.next() {
+            Some(name_str) => name_str.to_string(),
             None => return Err(()),
         };
-        let mut email = [0; 255];
-        match iter.next() {
-            Some(mail_str) => str2arr(mail_str, &mut email),
+        let email = match iter.next() {
+            Some(mail_str) => mail_str.to_string(),
             None => return Err(()),
         };
 
@@ -55,12 +53,12 @@ impl Row {
 
     pub fn serialize(&self, slot: &mut [u8]) {
         slot[ID_OFFSET..USERNAME_OFFSET].copy_from_slice(&self.id.to_le_bytes());
-        slot[USERNAME_OFFSET..EMAIL_OFFSET].copy_from_slice(&self.username);
-        slot[EMAIL_OFFSET..].copy_from_slice(&self.email);
+        string2arr(&self.username, &mut slot[USERNAME_OFFSET..EMAIL_OFFSET]);
+        string2arr(&self.email, &mut slot[EMAIL_OFFSET..]);
     }
 }
 
-fn str2arr(s: &str, arr: &mut [u8]) {
+fn string2arr(s: &String, arr: &mut [u8]) {
     s.chars()
         .zip(arr.iter_mut())
         .for_each(|(b, ptr)| *ptr = b as u8);
