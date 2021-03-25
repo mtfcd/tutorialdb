@@ -1,12 +1,29 @@
+const ID_SIZE: usize = 4;
+const USERNAME_SIZE: usize = 32;
+const EMAIL_SIZE: usize = 255;
+const ID_OFFSET: usize = 0;
+const USERNAME_OFFSET: usize = ID_OFFSET + ID_SIZE;
+const EMAIL_OFFSET: usize = USERNAME_OFFSET + USERNAME_SIZE;
+const ROW_SIZE: usize = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 
+const TABLE_MAX_PAGE: usize = 100;
+const PAGE_SIZE: usize = 4019;
+const ROWS_PER_PAGE: usize = PAGE_SIZE / ROW_SIZE;
+const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
 
 #[derive(Debug)]
 pub struct Row {
-    id: i32,
-    username: [u8; 32], // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
-    email: [u8; 255]
+    id: u32,
+    username: [u8; USERNAME_SIZE], // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
+    email: [u8; EMAIL_SIZE]
 }
 
+type Page = [u8; PAGE_SIZE];
+
+struct Table {
+    num_rows: usize,
+    pages: Vec<Page>
+}
 
 impl Row {
     pub fn new(input: &str) -> Result<Self, ()> {
@@ -32,6 +49,12 @@ impl Row {
         };
 
         return Ok(Row{id, username, email})
+    }
+
+    pub fn serialize(&self, slot: &mut [u8; ROW_SIZE]) {
+        slot[ID_OFFSET..ID_SIZE].copy_from_slice(&self.id.to_le_bytes());
+        slot[USERNAME_OFFSET..USERNAME_SIZE].copy_from_slice(&self.username);
+        slot[EMAIL_OFFSET..EMAIL_SIZE].copy_from_slice(&self.email);
     }
 }
 
