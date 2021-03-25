@@ -3,9 +3,10 @@
 #[derive(Debug)]
 pub struct Row {
     id: i32,
-    username: [char; 25],
-    email: [char; 255]
+    username: [u8; 32], // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
+    email: [u8; 255]
 }
+
 
 impl Row {
     pub fn new(input: &str) -> Result<Self, ()> {
@@ -19,12 +20,12 @@ impl Row {
             },
             None => return Err(())
         };
-        let mut username = ['\0'; 25];
+        let mut username = [0; 32];
         match iter.next() {
             Some(name_str) => str2arr(name_str, &mut username),
             None => return Err(())
         };
-        let mut email = ['\0'; 255];
+        let mut email = [0; 255];
         match iter.next() {
             Some(mail_str) => str2arr(mail_str, &mut email),
             None => return Err(())
@@ -34,8 +35,8 @@ impl Row {
     }
 }
 
-fn str2arr(s: &str, arr: &mut [char]) {
+fn str2arr(s: &str, arr: &mut [u8]) {
     s.chars()
     .zip(arr.iter_mut())
-    .for_each(|(b, ptr)| *ptr = b);
+    .for_each(|(b, ptr)| *ptr = b as u8);
 } 
