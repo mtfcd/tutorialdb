@@ -1,4 +1,4 @@
-mod data_struct;
+mod table;
 
 use std::{io::{self, Write}, process};
 
@@ -62,7 +62,7 @@ fn do_meta_command(input: &str) -> MetaCommandResult {
 }
 
 enum StatementType {
-    StatementInsert(data_struct::Row),
+    StatementInsert(table::Row),
     StatementSelect,
 }
 
@@ -74,7 +74,7 @@ enum PrepareResult {
 
 fn prepare_statement(input: &str) -> PrepareResult {
     if input.starts_with("insert") {
-        let statement = match data_struct::Row::new(input) {
+        let statement = match table::Row::new(input) {
             Ok(row) => row,
             Err(_) => return PrepareResult::PrepareSyntaxError
         };

@@ -15,14 +15,12 @@ const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
 pub struct Row {
     id: u32,
     username: [u8; USERNAME_SIZE], // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
-    email: [u8; EMAIL_SIZE]
+    email: [u8; EMAIL_SIZE],
 }
-
-type Page = [u8; PAGE_SIZE];
 
 struct Table {
     num_rows: usize,
-    pages: Vec<Page>
+    pages: Vec<Vec<u8>>, // ideal implemention would be a fix sized Vec.
 }
 
 impl Row {
@@ -33,22 +31,26 @@ impl Row {
         let id = match iter.next() {
             Some(id_str) => match id_str.parse() {
                 Ok(value) => value,
-                Err(_) => return Err(())
+                Err(_) => return Err(()),
             },
-            None => return Err(())
+            None => return Err(()),
         };
         let mut username = [0; 32];
         match iter.next() {
             Some(name_str) => str2arr(name_str, &mut username),
-            None => return Err(())
+            None => return Err(()),
         };
         let mut email = [0; 255];
         match iter.next() {
             Some(mail_str) => str2arr(mail_str, &mut email),
-            None => return Err(())
+            None => return Err(()),
         };
 
-        return Ok(Row{id, username, email})
+        return Ok(Row {
+            id,
+            username,
+            email,
+        });
     }
 
     pub fn serialize(&self, slot: &mut [u8; ROW_SIZE]) {
@@ -60,6 +62,25 @@ impl Row {
 
 fn str2arr(s: &str, arr: &mut [u8]) {
     s.chars()
-    .zip(arr.iter_mut())
-    .for_each(|(b, ptr)| *ptr = b as u8);
-} 
+        .zip(arr.iter_mut())
+        .for_each(|(b, ptr)| *ptr = b as u8);
+}
+
+impl Table {
+    pub fn new() -> Self {
+        Table {
+            num_rows: 0,
+            pages: Vec::new(),
+        }
+    }
+
+    pub fn row_slot(&mut self) -> &mut [u8] {
+        let page_num = self.num_rows / ROWS_PER_PAGE;
+        if let None = self.pages.get(page_num) {
+            self.pages.push(Vec::with_capacity(PAGE_SIZE));
+        }
+
+        let offset: usize = self.num_rows % ROWS_PER_PAGE;
+        &mut self.pages[page_num][offset..ROW_SIZE]
+    }
+}
