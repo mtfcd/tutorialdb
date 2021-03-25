@@ -18,7 +18,7 @@ pub struct Row {
     email: [u8; EMAIL_SIZE],
 }
 
-struct Table {
+pub struct Table {
     num_rows: usize,
     pages: Vec<Vec<u8>>, // ideal implemention would be a fix sized Vec.
 }
@@ -53,10 +53,10 @@ impl Row {
         });
     }
 
-    pub fn serialize(&self, slot: &mut [u8; ROW_SIZE]) {
-        slot[ID_OFFSET..ID_SIZE].copy_from_slice(&self.id.to_le_bytes());
-        slot[USERNAME_OFFSET..USERNAME_SIZE].copy_from_slice(&self.username);
-        slot[EMAIL_OFFSET..EMAIL_SIZE].copy_from_slice(&self.email);
+    pub fn serialize(&self, slot: &mut [u8]) {
+        slot[ID_OFFSET..USERNAME_OFFSET].copy_from_slice(&self.id.to_le_bytes());
+        slot[USERNAME_OFFSET..EMAIL_OFFSET].copy_from_slice(&self.username);
+        slot[EMAIL_OFFSET..].copy_from_slice(&self.email);
     }
 }
 
@@ -77,10 +77,28 @@ impl Table {
     pub fn row_slot(&mut self) -> &mut [u8] {
         let page_num = self.num_rows / ROWS_PER_PAGE;
         if let None = self.pages.get(page_num) {
-            self.pages.push(Vec::with_capacity(PAGE_SIZE));
+            self.pages.push(vec![0; PAGE_SIZE]);
         }
 
         let offset: usize = self.num_rows % ROWS_PER_PAGE;
         &mut self.pages[page_num][offset..ROW_SIZE]
     }
+
+    pub fn is_full(&self) -> bool {
+        self.num_rows >= TABLE_MAX_ROWS
+    }
+
+    pub fn insert(&mut self, row: Row) -> ExecuteResult {
+        if self.is_full() {
+            return ExecuteResult::ExecuteTableFull;
+        }
+        row.serialize(self.row_slot());
+        self.num_rows += 1;
+        return ExecuteResult::ExecuteSuccess;
+    }
+}
+
+pub enum ExecuteResult {
+    ExecuteSuccess,
+    ExecuteTableFull,
 }
