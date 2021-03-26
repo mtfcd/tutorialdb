@@ -47,7 +47,7 @@ fn main() {
 }
 
 fn print_prompt() {
-    print!("db > ");
+    print!("db >");
     io::stdout().flush().unwrap();
 }
 

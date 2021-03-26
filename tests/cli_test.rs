@@ -1,34 +1,42 @@
-use std::{io::{BufRead, BufReader, BufWriter, Cursor, Read, Write}, process::{Command, Stdio}, time::Duration};
-use std::thread;
+use std::{io::{Read, Write}, process::{ChildStdout, ChildStdin, Command, Stdio}};
 
 
 #[test]
 fn test_insert() {
-    let mut cmd = Command::new("./target/debug/tutorialdb.exe")
+    let cmd = Command::new("./target/debug/tutorialdb.exe")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
 
     let mut stdin = cmd.stdin.unwrap();
-    let mut wrter = BufWriter::new(&mut stdin);
-
-
-    let mut stdout = cmd.stdout.as_mut().unwrap();
-    let mut prompt = vec![0; 10000];
-    // let mut buf_reader = BufReader::new(stdout);
-    for i in 1..2 {
+    let mut stdout = cmd.stdout.unwrap();
+    for i in 1..3 {
         println!("round {}", i);
-        (&mut stdout).read(&mut prompt).unwrap();
-        println!("{}, {}", String::from_utf8(prompt.clone()).unwrap(), prompt.len());
-        // prompt.clear();
-        thread::sleep(Duration::from_secs(1));
+        read_child_output(&mut stdout);
         let username = format!("user_{}", i);
         let email = format!("user_{}@mail.com", i);
         let insert = format!("insert {} {} {}\n", i, username, email);
-        println!("input1 {}", insert);
-        wrter.write(insert.as_bytes()).unwrap();
-        println!("input1 {}", insert);
+        write_child_stdin(&mut stdin, insert);
     }
-    thread::sleep(Duration::from_secs(1));
+    read_child_output(&mut stdout);
+    write_child_stdin(&mut stdin, "select\n".into());
+    read_child_output(&mut stdout);
+    write_child_stdin(&mut stdin, ".exit\n".into());
+}
+
+fn write_child_stdin(stdin: &mut ChildStdin, input: String) {
+    stdin.write(input.as_bytes()).unwrap();
+    println!("{}", input);
+}
+
+fn read_child_output(stdout: &mut ChildStdout) {
+    let mut prompt = [0u8; 100];
+    loop {
+        let read_len = stdout.read(&mut prompt).unwrap();
+        print!("{}", String::from_utf8(Vec::from(&prompt as &[u8])).unwrap());
+        if read_len == 0 || prompt[read_len - 1] == b'>' {
+            break;
+        }
+    }
 }
