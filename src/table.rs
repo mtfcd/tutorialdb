@@ -9,7 +9,7 @@ const EMAIL_OFFSET: usize = USERNAME_OFFSET + USERNAME_SIZE;
 const ROW_SIZE: usize = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 
 const TABLE_MAX_PAGE: usize = 100;
-const PAGE_SIZE: usize = 4019;
+const PAGE_SIZE: usize = 4096;
 const ROWS_PER_PAGE: usize = PAGE_SIZE / ROW_SIZE;
 const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
 

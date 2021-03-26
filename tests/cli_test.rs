@@ -11,7 +11,7 @@ fn test_insert() {
 
     let mut stdin = cmd.stdin.unwrap();
     let mut stdout = cmd.stdout.unwrap();
-    for i in 1..3 {
+    for i in 1..1402 { // table will full at 1400.
         println!("round {}", i);
         read_child_output(&mut stdout);
         let username = format!("user_{}", i);
