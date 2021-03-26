@@ -5,6 +5,8 @@ use std::{
     process,
 };
 
+use table::{SyntaxErr};
+
 fn main() {
     let mut tbl = table::Table::new();
     loop {
@@ -35,8 +37,12 @@ fn main() {
                 println!("Unrecognized keyword at start of {}.", input);
                 continue;
             }
-            PrepareResult::PrepareSyntaxError => {
-                println!("sytax error near {}.", input);
+            PrepareResult::PrepareSyntaxError(err) => {
+                match err {
+                    SyntaxErr::WrongArgsNum => println!("sytax error near {}, err: wrong number of args.", input),
+                    SyntaxErr::StringTooLong => println!("sytax error, string too long.")
+                }
+                
                 continue;
             }
         };
@@ -73,14 +79,14 @@ enum StatementType {
 enum PrepareResult {
     PrepareSuccess(StatementType),
     PrepareUnRecognizedStatement,
-    PrepareSyntaxError,
+    PrepareSyntaxError(SyntaxErr),
 }
 
 fn prepare_statement(input: &str) -> PrepareResult {
     if input.starts_with("insert") {
         let statement = match table::Row::new(input) {
             Ok(row) => row,
-            Err(_) => return PrepareResult::PrepareSyntaxError,
+            Err(syntax_err) => return PrepareResult::PrepareSyntaxError(syntax_err),
         };
         return PrepareResult::PrepareSuccess(StatementType::StatementInsert(statement));
     }

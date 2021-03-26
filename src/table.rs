@@ -25,25 +25,40 @@ pub struct Table {
     pages: Vec<Vec<u8>>, // ideal implemention would be a fix sized Vec.
 }
 
+pub enum SyntaxErr {
+    StringTooLong,
+    WrongArgsNum,
+}
+
 impl Row {
-    pub fn new(input: &str) -> Result<Self, ()> {
+    pub fn new(input: &str) -> Result<Self, SyntaxErr> {
         let mut iter = input.split_ascii_whitespace();
         iter.next(); // pop out "insert"
 
         let id = match iter.next() {
             Some(id_str) => match id_str.parse() {
                 Ok(value) => value,
-                Err(_) => return Err(()),
+                Err(_) => return Err(SyntaxErr::WrongArgsNum),
             },
-            None => return Err(()),
+            None => return Err(SyntaxErr::WrongArgsNum),
         };
         let username = match iter.next() {
-            Some(name_str) => name_str.to_string(),
-            None => return Err(()),
+            Some(name_str) => {
+                if name_str.len() > USERNAME_SIZE {
+                    return Err(SyntaxErr::StringTooLong)
+                }
+                name_str.to_string()
+            }
+            None => return Err(SyntaxErr::WrongArgsNum),
         };
         let email = match iter.next() {
-            Some(mail_str) => mail_str.to_string(),
-            None => return Err(()),
+            Some(mail_str) => {
+                if mail_str.len() > EMAIL_SIZE {
+                    return Err(SyntaxErr::StringTooLong)
+                }
+                mail_str.to_string()
+            }
+            None => return Err(SyntaxErr::WrongArgsNum),
         };
 
         return Ok(Row {
