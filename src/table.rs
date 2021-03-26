@@ -28,6 +28,7 @@ pub struct Table {
 pub enum SyntaxErr {
     StringTooLong,
     WrongArgsNum,
+    InvalidID,  // orignal error type in the blog is negtive id, which is will be catch by parsing from str to usize. 
 }
 
 impl Row {
@@ -38,7 +39,7 @@ impl Row {
         let id = match iter.next() {
             Some(id_str) => match id_str.parse() {
                 Ok(value) => value,
-                Err(_) => return Err(SyntaxErr::WrongArgsNum),
+                Err(_) => return Err(SyntaxErr::InvalidID),
             },
             None => return Err(SyntaxErr::WrongArgsNum),
         };

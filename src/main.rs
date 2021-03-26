@@ -39,8 +39,9 @@ fn main() {
             }
             PrepareResult::PrepareSyntaxError(err) => {
                 match err {
-                    SyntaxErr::WrongArgsNum => println!("sytax error near {}, err: wrong number of args.", input),
-                    SyntaxErr::StringTooLong => println!("sytax error, string too long.")
+                    SyntaxErr::WrongArgsNum => println!("syntax error near {}, err: wrong number of args.", input),
+                    SyntaxErr::StringTooLong => println!("syntax error, string too long."),
+                    SyntaxErr::InvalidID => println!("syntax err, invalid id format.")
                 }
                 
                 continue;
