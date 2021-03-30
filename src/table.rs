@@ -1,4 +1,8 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, io::SeekFrom, io::Seek, io::Read};
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::process;
+
 
 const ID_SIZE: usize = 4;
 const USERNAME_SIZE: usize = 32;
@@ -22,7 +26,7 @@ pub struct Row {
 
 pub struct Table {
     num_rows: usize,
-    pages: Vec<Vec<u8>>, // ideal implemention would be a fix sized Vec.
+    pager: Pager,
 }
 
 pub enum SyntaxErr {
@@ -90,21 +94,20 @@ fn string2arr(s: &String, arr: &mut [u8]) {
 }
 
 impl Table {
-    pub fn new() -> Self {
+    pub fn db_open(file_name: &str) -> Self {
+        let pager = Pager::open(file_name);
         Table {
-            num_rows: 0,
-            pages: Vec::new(),
+            num_rows: pager.file_length / ROW_SIZE,
+            pager,
         }
     }
 
     pub fn row_slot(&mut self, row_num: usize) -> &mut [u8] {
         let page_num = row_num / ROWS_PER_PAGE;
-        if let None = self.pages.get(page_num) {
-            self.pages.push(vec![0; PAGE_SIZE]);
-        }
+        let page = self.pager.get_page(page_num);
 
         let offset: usize = row_num % ROWS_PER_PAGE;
-        &mut self.pages[page_num][(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
+        &mut page[(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
     }
 
     pub fn is_full(&self) -> bool {
@@ -132,4 +135,71 @@ impl Table {
 pub enum ExecuteResult {
     ExecuteSuccess,
     ExecuteTableFull,
+}
+
+type Page = Vec<u8>;
+
+struct Pager {
+    pages: Vec<Page>,
+    fd: File,
+    file_length: usize,
+}
+
+impl Pager {
+    fn open(file_name: &str) -> Self {
+        let file = match OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true)
+            .open(file_name) {
+                Ok(file) => file,
+                Err(_) => process::exit(1)
+            };
+        
+        let file_len: usize;
+        match file.metadata() {
+            Ok(meta) => file_len = meta.len() as usize,
+            Err(_) => process::exit(1),
+        }
+
+        return Pager {
+            pages: vec![Page::new(); TABLE_MAX_PAGE],
+            fd: file,
+            file_length: file_len,
+        }
+    }
+
+    fn get_page<'a>(&'a mut self, page_num: usize) -> &'a mut Page {
+        if page_num > TABLE_MAX_PAGE {
+            println!("Tried to fetch page number out of bounds. {} > {}", page_num, TABLE_MAX_PAGE);
+            process::exit(2);
+        }
+        {
+            if let Some(page) = self.pages.get_mut(page_num) {
+                return page
+            }
+        }
+        {
+            let mut new_page = Page::with_capacity(PAGE_SIZE);
+            let num_pages = self.file_length / PAGE_SIZE;
+            if page_num <= num_pages {
+                match self.fd.seek(SeekFrom::Start((page_num * PAGE_SIZE) as u64)) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Error reading file {}", e);
+                        process::exit(2)
+                    }
+                };
+                match self.fd.read_exact(&mut new_page) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Error reading file {}", e);
+                        process::exit(2)
+                    }
+                };
+            }
+            self.pages[page_num] = new_page;
+            return &mut (self.pages[page_num])
+        }
+    }
 }

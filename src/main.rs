@@ -8,7 +8,7 @@ use std::{
 use table::{SyntaxErr};
 
 fn main() {
-    let mut tbl = table::Table::new();
+    let mut tbl = table::Table::db_open("abc.db");
     loop {
         print_prompt();
         let mut input = String::new();
