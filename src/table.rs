@@ -140,7 +140,7 @@ pub enum ExecuteResult {
 type Page = Vec<u8>;
 
 struct Pager {
-    pages: Vec<Page>,
+    pages: Vec<Option<Page>>, // use a Option here to check if a page is in memory.
     fd: File,
     file_length: usize,
 }
@@ -163,7 +163,7 @@ impl Pager {
         }
 
         return Pager {
-            pages: vec![Page::new(); TABLE_MAX_PAGE],
+            pages: vec![None; TABLE_MAX_PAGE],
             fd: file,
             file_length: file_len,
         }
@@ -174,32 +174,35 @@ impl Pager {
             println!("Tried to fetch page number out of bounds. {} > {}", page_num, TABLE_MAX_PAGE);
             process::exit(2);
         }
-        {
-            if let Some(page) = self.pages.get_mut(page_num) {
-                return page
-            }
-        }
-        {
-            let mut new_page = Page::with_capacity(PAGE_SIZE);
+
+        let page_opt = &self.pages[page_num]; // inorder to check if a page is exists and return a &mut
+                                                             // it has to make a immutable borrow first.
+                                                             // or it will hava a problem https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
+        if page_opt.is_none() {
+            let mut new_page = vec![0; PAGE_SIZE];
             let num_pages = self.file_length / PAGE_SIZE;
-            if page_num <= num_pages {
-                match self.fd.seek(SeekFrom::Start((page_num * PAGE_SIZE) as u64)) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("Error reading file {}", e);
-                        process::exit(2)
-                    }
-                };
-                match self.fd.read_exact(&mut new_page) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("Error reading file {}", e);
-                        process::exit(2)
-                    }
-                };
+            if page_num < num_pages {
+                file_read(&mut self.fd, page_num * PAGE_SIZE, &mut new_page);
             }
-            self.pages[page_num] = new_page;
-            return &mut (self.pages[page_num])
+            self.pages[page_num] = Some(new_page);
+        }
+        self.pages[page_num].as_mut().unwrap()
+    }
+}
+
+fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
+    match file.seek(SeekFrom::Start(pos as u64)) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Error reading file {}", e);
+            process::exit(2)
+        }
+    };
+    match file.read_exact(buf) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Error reading file {}", e);
+            process::exit(2)
         }
     }
 }
