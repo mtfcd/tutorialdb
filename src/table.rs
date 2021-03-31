@@ -176,7 +176,7 @@ impl Pager {
         }
 
         let page_opt = &self.pages[page_num]; // inorder to check if a page is exists and return a &mut
-                                                             // it has to make a immutable borrow first.
+                                                             // it has to make a immutable borrow for check and then a mut borrow for return.
                                                              // or it will hava a problem https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
         if page_opt.is_none() {
             let mut new_page = vec![0; PAGE_SIZE];
