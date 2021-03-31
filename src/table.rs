@@ -196,7 +196,10 @@ impl Pager {
         let page_opt = &self.pages[page_num]; 
         if page_opt.is_none() {
             let mut new_page = vec![0; PAGE_SIZE];
-            let num_pages = self.file_length / PAGE_SIZE;
+            let mut num_pages = self.file_length / PAGE_SIZE;
+            if self.file_length % PAGE_SIZE > 0 {
+                num_pages += 1;
+            }
             if page_num < num_pages {
                 file_read(&mut self.fd, page_num * PAGE_SIZE, &mut new_page);
             }
@@ -212,7 +215,6 @@ impl Pager {
                 process::exit(2);
             }
             Some(ref page) => {
-                println!("{:?}", page);
                 seek_file(&mut self.fd, page_num * PAGE_SIZE);
                 if let Err(e) = self.fd.write(&page[0..size]) {
                     println!("Error writing: {}", e);
@@ -226,7 +228,7 @@ impl Pager {
 
 fn seek_file(file: &mut File, pos: usize) {
     match file.seek(SeekFrom::Start(pos as u64)) {
-        Ok(_) => {}
+        Ok(_) => {},
         Err(e) => {
             println!("Error reading file {}", e);
             process::exit(2)
@@ -236,8 +238,8 @@ fn seek_file(file: &mut File, pos: usize) {
 
 fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
     seek_file(file, pos);
-    match file.read_exact(buf) {
-        Ok(_) => {}
+    match file.read(buf) {
+        Ok(_) => {},
         Err(e) => {
             println!("Error reading file {}", e);
             process::exit(2)
