@@ -1,4 +1,4 @@
-use std::{convert::TryInto, io::SeekFrom, io::Seek, io::Read};
+use std::{convert::TryInto, io::Read, io::Seek, io::{SeekFrom, Write}};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::process;
@@ -20,7 +20,7 @@ const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
 #[derive(Debug)]
 pub struct Row {
     id: u32,
-    username: String, // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
+    username: String,
     email: String,
 }
 
@@ -130,6 +130,21 @@ impl Table {
             println!("({}, {}, {})", row.id, row.username, row.email);
         }
     }
+
+    pub fn db_close(&mut self) {
+        let num_full_pages = self.num_rows / ROWS_PER_PAGE;
+        for i in 0..num_full_pages {
+            if let Some(_) = self.pager.pages[i] {
+                self.pager.flush(i, PAGE_SIZE);
+            }
+        }
+        let num_additional_rows = self.num_rows % ROWS_PER_PAGE;
+        if num_additional_rows > 0 {
+            if let Some(_) = self.pager.pages[num_full_pages] {
+                self.pager.flush(num_full_pages, num_additional_rows * ROW_SIZE);
+            }
+        }
+    }
 }
 
 pub enum ExecuteResult {
@@ -137,7 +152,7 @@ pub enum ExecuteResult {
     ExecuteTableFull,
 }
 
-type Page = Vec<u8>;
+type Page = Vec<u8>; // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
 
 struct Pager {
     pages: Vec<Option<Page>>, // use a Option here to check if a page is in memory.
@@ -149,7 +164,7 @@ impl Pager {
     fn open(file_name: &str) -> Self {
         let file = match OpenOptions::new()
             .read(true)
-            .append(true)
+            .write(true)
             .create(true)
             .open(file_name) {
                 Ok(file) => file,
@@ -174,10 +189,11 @@ impl Pager {
             println!("Tried to fetch page number out of bounds. {} > {}", page_num, TABLE_MAX_PAGE);
             process::exit(2);
         }
-
-        let page_opt = &self.pages[page_num]; // inorder to check if a page is exists and return a &mut
-                                                             // it has to make a immutable borrow for check and then a mut borrow for return.
-                                                             // or it will hava a problem https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
+        
+        // inorder to check if a page is exists and return a &mut
+        // it has to make a immutable borrow for check and then a mut borrow for return.
+        // or it will hava a problem https://rust-lang.github.io/rfcs/2094-nll.html#problem-case-3-conditional-control-flow-across-functions
+        let page_opt = &self.pages[page_num]; 
         if page_opt.is_none() {
             let mut new_page = vec![0; PAGE_SIZE];
             let num_pages = self.file_length / PAGE_SIZE;
@@ -188,9 +204,27 @@ impl Pager {
         }
         self.pages[page_num].as_mut().unwrap()
     }
+
+    fn flush(&mut self, page_num: usize, size: usize) {
+        match self.pages[page_num] {
+            None => {
+                println!("Tried to flush null page");
+                process::exit(2);
+            }
+            Some(ref page) => {
+                println!("{:?}", page);
+                seek_file(&mut self.fd, page_num * PAGE_SIZE);
+                if let Err(e) = self.fd.write(&page[0..size]) {
+                    println!("Error writing: {}", e);
+                    process::exit(2);
+                }
+            }
+        }
+
+    }
 }
 
-fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
+fn seek_file(file: &mut File, pos: usize) {
     match file.seek(SeekFrom::Start(pos as u64)) {
         Ok(_) => {}
         Err(e) => {
@@ -198,6 +232,10 @@ fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
             process::exit(2)
         }
     };
+}
+
+fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
+    seek_file(file, pos);
     match file.read_exact(buf) {
         Ok(_) => {}
         Err(e) => {

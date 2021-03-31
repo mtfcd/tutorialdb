@@ -22,7 +22,7 @@ fn main() {
         let input = input.trim();
 
         if input.starts_with(".") {
-            match do_meta_command(input) {
+            match do_meta_command(input, &mut tbl) {
                 MetaCommandResult::MetaCommandSuccess => continue,
                 MetaCommandResult::MetaCommandUnrecognizedCommand => {
                     println!("unrecgonized command {}", input);
@@ -63,9 +63,10 @@ enum MetaCommandResult {
     MetaCommandUnrecognizedCommand,
 }
 
-fn do_meta_command(input: &str) -> MetaCommandResult {
+fn do_meta_command(input: &str, tbl: &mut table::Table) -> MetaCommandResult {
     match input {
         ".exit" => {
+            tbl.db_close();
             process::exit(0);
         }
         _ => return MetaCommandResult::MetaCommandUnrecognizedCommand,
