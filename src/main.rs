@@ -5,10 +5,10 @@ use std::{
     process,
 };
 
-use table::{SyntaxErr};
+use table::{SyntaxErr, Table, Cursor, Row, ExecuteResult};
 
 fn main() {
-    let mut tbl = table::Table::db_open("abc.db");
+    let mut tbl = Table::db_open("abc.db");
     loop {
         print_prompt();
         let mut input = String::new();
@@ -63,7 +63,7 @@ enum MetaCommandResult {
     MetaCommandUnrecognizedCommand,
 }
 
-fn do_meta_command(input: &str, tbl: &mut table::Table) -> MetaCommandResult {
+fn do_meta_command(input: &str, tbl: &mut Table) -> MetaCommandResult {
     match input {
         ".exit" => {
             tbl.db_close();
@@ -74,7 +74,7 @@ fn do_meta_command(input: &str, tbl: &mut table::Table) -> MetaCommandResult {
 }
 
 enum StatementType {
-    StatementInsert(table::Row),
+    StatementInsert(Row),
     StatementSelect,
 }
 
@@ -86,7 +86,7 @@ enum PrepareResult {
 
 fn prepare_statement(input: &str) -> PrepareResult {
     if input.starts_with("insert") {
-        let statement = match table::Row::new(input) {
+        let statement = match Row::new(input) {
             Ok(row) => row,
             Err(syntax_err) => return PrepareResult::PrepareSyntaxError(syntax_err),
         };
@@ -99,17 +99,17 @@ fn prepare_statement(input: &str) -> PrepareResult {
     return PrepareResult::PrepareUnRecognizedStatement;
 }
 
-fn execute_statement(statement: StatementType, tbl: &mut table::Table) {
+fn execute_statement(statement: StatementType, tbl: &mut Table) {
     match statement {
         StatementType::StatementInsert(row) => {
-            let mut cursor = table::Cursor::table_end(tbl);
+            let mut cursor = Cursor::table_end(tbl);
             match cursor.insert(row) {
-                table::ExecuteResult::ExecuteSuccess => println!("execute insert 1 row."),
-                table::ExecuteResult::ExecuteTableFull => println!("table has full."),
+                ExecuteResult::ExecuteSuccess => println!("execute insert 1 row."),
+                ExecuteResult::ExecuteTableFull => println!("table has full."),
             };
         }
         StatementType::StatementSelect => {
-            let mut cursor = table::Cursor::table_start(tbl);
+            let mut cursor = Cursor::table_start(tbl);
             cursor.select();
         }
     }
