@@ -102,33 +102,8 @@ impl Table {
         }
     }
 
-    pub fn row_slot(&mut self, row_num: usize) -> &mut [u8] {
-        let page_num = row_num / ROWS_PER_PAGE;
-        let page = self.pager.get_page(page_num);
-
-        let offset: usize = row_num % ROWS_PER_PAGE;
-        &mut page[(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
-    }
-
     pub fn is_full(&self) -> bool {
         self.num_rows >= TABLE_MAX_ROWS
-    }
-
-    pub fn insert(&mut self, row: Row) -> ExecuteResult {
-        if self.is_full() {
-            return ExecuteResult::ExecuteTableFull;
-        }
-        row.serialize(self.row_slot(self.num_rows));
-        self.num_rows += 1;
-        return ExecuteResult::ExecuteSuccess;
-    }
-
-    pub fn select(&mut self) {
-        for i in 0..self.num_rows {
-            let row_slot = self.row_slot(i);
-            let row = Row::deserialize(row_slot);
-            println!("({}, {}, {})", row.id, row.username, row.email);
-        }
     }
 
     pub fn db_close(&mut self) {
