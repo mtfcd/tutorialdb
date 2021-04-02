@@ -246,3 +246,65 @@ fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
         }
     }
 }
+
+pub struct Cursor<'a> {
+    table: &'a mut Table,
+    row_num: usize,
+    end_of_table: bool,
+}
+
+impl<'a> Cursor<'a> {
+    pub fn table_start(table: &'a mut Table) -> Self {
+        let end_of_table = table.num_rows == 0; 
+        Cursor {
+            table,
+            row_num: 0,
+            end_of_table
+        }
+    }
+
+    pub fn table_end(table: &'a mut Table) -> Self {
+        // assignment in struct construct will produce error.
+        // so here assign to a viariable first. not sure why. same in fn table_start.
+        let row_num = table.num_rows; 
+        Cursor {
+            table,
+            row_num,
+            end_of_table: true
+        }
+    }
+
+    fn advance(&mut self) {
+        self.row_num += 1;
+        if self.row_num >= self.table.num_rows {
+            self.end_of_table = true;
+        }
+    }
+
+    fn value(&mut self) -> &mut [u8] {
+        let row_num = self.row_num;
+        let page_num = row_num / ROWS_PER_PAGE;
+        let page = self.table.pager.get_page(page_num);
+
+        let offset: usize = row_num % ROWS_PER_PAGE;
+        &mut page[(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
+    }
+
+    pub fn insert(&mut self, row: Row) -> ExecuteResult {
+        if self.table.is_full() {
+            return ExecuteResult::ExecuteTableFull;
+        }
+        row.serialize(self.value());
+        self.table.num_rows += 1;
+        return ExecuteResult::ExecuteSuccess;
+    }
+
+    pub fn select(&mut self) {
+        while !self.end_of_table {
+            let row_slot = self.value();
+            let row = Row::deserialize(row_slot);
+            println!("({}, {}, {})", row.id, row.username, row.email);
+            self.advance();
+        }
+    }
+}

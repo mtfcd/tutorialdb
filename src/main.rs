@@ -102,13 +102,15 @@ fn prepare_statement(input: &str) -> PrepareResult {
 fn execute_statement(statement: StatementType, tbl: &mut table::Table) {
     match statement {
         StatementType::StatementInsert(row) => {
-            match tbl.insert(row) {
+            let mut cursor = table::Cursor::table_end(tbl);
+            match cursor.insert(row) {
                 table::ExecuteResult::ExecuteSuccess => println!("execute insert 1 row."),
                 table::ExecuteResult::ExecuteTableFull => println!("table has full."),
             };
         }
         StatementType::StatementSelect => {
-            tbl.select();
+            let mut cursor = table::Cursor::table_start(tbl);
+            cursor.select();
         }
     }
 }
