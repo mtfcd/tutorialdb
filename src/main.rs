@@ -1,4 +1,5 @@
 mod table;
+mod btree;
 
 use std::{
     io::{self, Write},

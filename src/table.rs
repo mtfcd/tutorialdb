@@ -1,4 +1,6 @@
-use std::{convert::TryInto, io::Read, io::Seek, io::{SeekFrom, Write}};
+use super::btree::*;
+
+use std::{convert::TryInto, io::Read, io::Seek, io::{SeekFrom, Write}, usize};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::process;
@@ -10,29 +12,16 @@ const EMAIL_SIZE: usize = 255;
 const ID_OFFSET: usize = 0;
 const USERNAME_OFFSET: usize = ID_OFFSET + ID_SIZE;
 const EMAIL_OFFSET: usize = USERNAME_OFFSET + USERNAME_SIZE;
-const ROW_SIZE: usize = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+pub const ROW_SIZE: usize = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 
 const TABLE_MAX_PAGE: usize = 100;
-const PAGE_SIZE: usize = 4096;
-const ROWS_PER_PAGE: usize = PAGE_SIZE / ROW_SIZE;
-const TABLE_MAX_ROWS: usize = TABLE_MAX_PAGE * ROWS_PER_PAGE;
+pub const PAGE_SIZE: usize = 4096;
 
 #[derive(Debug)]
 pub struct Row {
     id: u32,
     username: String,
     email: String,
-}
-
-pub struct Table {
-    num_rows: usize,
-    pager: Pager,
-}
-
-pub enum SyntaxErr {
-    StringTooLong,
-    WrongArgsNum,
-    InvalidID,  // orignal error type in the blog is negtive id, which is will be catch by parsing from str to usize. 
 }
 
 impl Row {
@@ -93,30 +82,35 @@ fn string2arr(s: &String, arr: &mut [u8]) {
         .for_each(|(b, ptr)| *ptr = b as u8);
 }
 
+pub struct Table {
+    root_page_num: usize,
+    pager: Pager,
+}
+
+pub enum SyntaxErr {
+    StringTooLong,
+    WrongArgsNum,
+    InvalidID,  // orignal error type in the blog is negtive id, which is will be catch by parsing from str to usize. 
+}
+
 impl Table {
     pub fn db_open(file_name: &str) -> Self {
-        let pager = Pager::open(file_name);
+        let mut pager = Pager::open(file_name);
+        if pager.num_pages == 0 {
+            let page = pager.get_page(0);
+            initialize_leaf_node(page);
+        }
+
         Table {
-            num_rows: pager.file_length / ROW_SIZE,
+            root_page_num: 0,
             pager,
         }
     }
 
-    pub fn is_full(&self) -> bool {
-        self.num_rows >= TABLE_MAX_ROWS
-    }
-
     pub fn db_close(&mut self) {
-        let num_full_pages = self.num_rows / ROWS_PER_PAGE;
-        for i in 0..num_full_pages {
+        for i in 0..self.pager.num_pages {
             if let Some(_) = self.pager.pages[i] {
-                self.pager.flush(i, PAGE_SIZE);
-            }
-        }
-        let num_additional_rows = self.num_rows % ROWS_PER_PAGE;
-        if num_additional_rows > 0 {
-            if let Some(_) = self.pager.pages[num_full_pages] {
-                self.pager.flush(num_full_pages, num_additional_rows * ROW_SIZE);
+                self.pager.flush(i);
             }
         }
     }
@@ -127,12 +121,11 @@ pub enum ExecuteResult {
     ExecuteTableFull,
 }
 
-type Page = Vec<u8>; // Rust use Unicode Scaler Value in Strings. but u8 is used. because char in C is a u8.
-
 struct Pager {
     pages: Vec<Option<Page>>, // use a Option here to check if a page is in memory.
     fd: File,
     file_length: usize,
+    num_pages: usize
 }
 
 impl Pager {
@@ -152,10 +145,16 @@ impl Pager {
             Err(_) => process::exit(1),
         }
 
+        if file_len % PAGE_SIZE != 0 {
+            println!("Db file is not a whole number of pages. Corrupt file.");
+            process::exit(1);
+        }
+
         return Pager {
             pages: vec![None; TABLE_MAX_PAGE],
             fd: file,
             file_length: file_len,
+            num_pages: file_len / PAGE_SIZE
         }
     }
 
@@ -179,11 +178,12 @@ impl Pager {
                 file_read(&mut self.fd, page_num * PAGE_SIZE, &mut new_page);
             }
             self.pages[page_num] = Some(new_page);
+            self.num_pages += 1;
         }
         self.pages[page_num].as_mut().unwrap()
     }
 
-    fn flush(&mut self, page_num: usize, size: usize) {
+    fn flush(&mut self, page_num: usize) {
         match self.pages[page_num] {
             None => {
                 println!("Tried to flush null page");
@@ -191,7 +191,7 @@ impl Pager {
             }
             Some(ref page) => {
                 seek_file(&mut self.fd, page_num * PAGE_SIZE);
-                if let Err(e) = self.fd.write(&page[0..size]) {
+                if let Err(e) = self.fd.write(&page[0..PAGE_SIZE]) {
                     println!("Error writing: {}", e);
                     process::exit(2);
                 }
@@ -224,16 +224,21 @@ fn file_read(file: &mut File, pos: usize, buf: &mut Vec<u8>) {
 
 pub struct Cursor<'a> {
     table: &'a mut Table,
-    row_num: usize,
+    page_num: usize,
+    cell_num: u32,
     end_of_table: bool,
 }
 
 impl<'a> Cursor<'a> {
     pub fn table_start(table: &'a mut Table) -> Self {
-        let end_of_table = table.num_rows == 0; 
+        let root_page_num = table.root_page_num;
+        let page = table.pager.get_page(root_page_num);
+        let num_cells = get_leaf_node_num_cells(page);
+        let end_of_table = num_cells == 0; 
         Cursor {
             table,
-            row_num: 0,
+            page_num: root_page_num,
+            cell_num: 0,
             end_of_table
         }
     }
@@ -241,36 +246,48 @@ impl<'a> Cursor<'a> {
     pub fn table_end(table: &'a mut Table) -> Self {
         // assignment in struct construct will produce error.
         // so here assign to a viariable first. not sure why. same in fn table_start.
-        let row_num = table.num_rows; 
+        let root_page_num = table.root_page_num;
+        let page = table.pager.get_page(root_page_num);
+        let num_cells = get_leaf_node_num_cells(page);
         Cursor {
             table,
-            row_num,
+            page_num: root_page_num,
+            cell_num: num_cells,
             end_of_table: true
         }
     }
 
     fn advance(&mut self) {
-        self.row_num += 1;
-        if self.row_num >= self.table.num_rows {
+        self.cell_num += 1;
+        
+        let page_num = self.page_num;
+        let page = self.table.pager.get_page(page_num);
+
+        if self.cell_num >= get_leaf_node_num_cells(page) {
             self.end_of_table = true;
         }
     }
 
     fn value(&mut self) -> &mut [u8] {
-        let row_num = self.row_num;
-        let page_num = row_num / ROWS_PER_PAGE;
+        let page_num = self.page_num;
         let page = self.table.pager.get_page(page_num);
 
-        let offset: usize = row_num % ROWS_PER_PAGE;
-        &mut page[(offset * ROW_SIZE)..((offset + 1) * ROW_SIZE)]
+        leaf_node_value(page, self.cell_num)
     }
 
     pub fn insert(&mut self, row: Row) -> ExecuteResult {
-        if self.table.is_full() {
+        let page = self.table.pager.get_page(self.page_num);
+        let num_cells = get_leaf_node_num_cells(page);
+
+        if num_cells as usize >= LEAF_NODE_MAX_CELLS {
             return ExecuteResult::ExecuteTableFull;
         }
+
+        if self.cell_num < num_cells {
+            make_room(page, self.cell_num);
+        }
+        set_leaf_node_num_cells(page, num_cells + 1);
         row.serialize(self.value());
-        self.table.num_rows += 1;
         return ExecuteResult::ExecuteSuccess;
     }
 
