@@ -74,3 +74,12 @@ pub fn make_room(page: &mut Page, cell_num: u32) {
     let idx_2 = leaf_node_offset(num_cell + 1);
     page[idx_1..idx_2].rotate_right(LEAF_NODE_CELL_SIZE);
 }
+
+pub fn print_constants() {
+    println!("ROW_SIZE: {}", ROW_SIZE);
+    println!("COMMON_NODE_HEADER_SIZE: {}", COMMON_NODE_HEADER_SIZE);
+    println!("LEAF_NODE_HEADER_SIZE: {}", LEAF_NODE_HEADER_SIZE);
+    println!("LEAF_NODE_CELL_SIZE: {}", LEAF_NODE_CELL_SIZE);
+    println!("LEAF_NODE_SPACE_FOR_CELLS: {}", LEAF_NODE_SPACE_FOR_CELLS);
+    println!("LEAF_NODE_MAX_CELLS: {}", LEAF_NODE_MAX_CELLS);
+}

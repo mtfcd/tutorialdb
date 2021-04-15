@@ -6,6 +6,7 @@ use std::{
     process,
 };
 
+use btree::print_constants;
 use table::{SyntaxErr, Table, Cursor, Row, ExecuteResult};
 
 fn main() {
@@ -69,6 +70,11 @@ fn do_meta_command(input: &str, tbl: &mut Table) -> MetaCommandResult {
         ".exit" => {
             tbl.db_close();
             process::exit(0);
+        }
+        ".constants" => {
+            println!("Constants:\n");
+            print_constants();
+            return MetaCommandResult::MetaCommandSuccess
         }
         _ => return MetaCommandResult::MetaCommandUnrecognizedCommand,
     }
