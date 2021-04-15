@@ -42,6 +42,12 @@ pub fn set_leaf_node_num_cells(page: &mut Page, cell_num: u32) {
     page[idx_1..idx_2].copy_from_slice(&cell_num.to_le_bytes());
 }
 
+pub fn set_leaf_node_key(page: &mut Page, cell_num: u32, key: u32) {
+    let idx_1 = leaf_node_offset(cell_num) + LEAF_NODE_KEY_OFFSET;
+    let idx_2 = idx_1 + LEAF_NODE_KEY_SIZE;
+
+    page[idx_1..idx_2].copy_from_slice(&key.to_le_bytes());
+}
 // pub fn leaf_node_cell(page: &Page, cell_num: u32) -> u32 {
 //     let idx_1 = LEAF_NODE_HEADER_SIZE + cell_num as usize * LEAF_NODE_CELL_SIZE;
 //     let idx_2 = idx_1 + LEAF_NODE_CELL_SIZE;

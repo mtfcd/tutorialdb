@@ -287,6 +287,7 @@ impl<'a> Cursor<'a> {
             make_room(page, self.cell_num);
         }
         set_leaf_node_num_cells(page, num_cells + 1);
+        set_leaf_node_key(page, num_cells, row.id);
         row.serialize(self.value());
         return ExecuteResult::ExecuteSuccess;
     }
