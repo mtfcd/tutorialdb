@@ -109,10 +109,11 @@ fn prepare_statement(input: &str) -> PrepareResult {
 fn execute_statement(statement: StatementType, tbl: &mut Table) {
     match statement {
         StatementType::StatementInsert(row) => {
-            let mut cursor = Cursor::table_end(tbl);
+            let mut cursor = tbl.find(row.id);
             match cursor.insert(row) {
                 ExecuteResult::ExecuteSuccess => println!("execute insert 1 row."),
                 ExecuteResult::ExecuteTableFull => println!("table has full."),
+                ExecuteResult::ExecuteDuplicateKey => println!("Error: Duplicate key.")
             };
         }
         StatementType::StatementSelect => {

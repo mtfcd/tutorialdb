@@ -19,7 +19,7 @@ pub const PAGE_SIZE: usize = 4096;
 
 #[derive(Debug)]
 pub struct Row {
-    id: u32,
+    pub id: u32,
     username: String,
     email: String,
 }
@@ -114,11 +114,21 @@ impl Table {
             }
         }
     }
+
+    pub fn find(&mut self, key: u32) -> Cursor {
+        let root_page_num = self.root_page_num;
+        let root_node = self.pager.get_page(root_page_num);
+        match get_node_type(root_node) {
+            NodeType::Leaf => Cursor::leaf_node_find(self, key),
+            NodeType::Iternal => process::exit(2)
+        }
+    }
 }
 
 pub enum ExecuteResult {
     ExecuteSuccess,
     ExecuteTableFull,
+    ExecuteDuplicateKey
 }
 
 struct Pager {
@@ -243,17 +253,30 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn table_end(table: &'a mut Table) -> Self {
-        // assignment in struct construct will produce error.
-        // so here assign to a viariable first. not sure why. same in fn table_start.
-        let root_page_num = table.root_page_num;
-        let page = table.pager.get_page(root_page_num);
-        let num_cells = get_leaf_node_num_cells(page);
-        Cursor {
+    pub fn leaf_node_find(table: &'a mut Table, key: u32) -> Self {
+        let mut min_index: u32 = 0;
+        let page_num = table.root_page_num;
+        let page = table.pager.get_page(page_num);
+        let mut one_past_max_index: u32 = get_leaf_node_num_cells(page);
+        while one_past_max_index != min_index {
+            let index: u32 = (one_past_max_index + min_index) / 2;
+            let key_at_index = get_leaf_node_key(page, index);
+            if key == key_at_index {
+                min_index = index;
+                break;
+            }
+            if key_at_index < key {
+                min_index = index + 1;
+            } else {
+                one_past_max_index = index;
+            }
+        }
+
+        return Cursor {
             table,
-            page_num: root_page_num,
-            cell_num: num_cells,
-            end_of_table: true
+            page_num,
+            cell_num: min_index,
+            end_of_table: false
         }
     }
 
@@ -282,12 +305,16 @@ impl<'a> Cursor<'a> {
         if num_cells as usize >= LEAF_NODE_MAX_CELLS {
             return ExecuteResult::ExecuteTableFull;
         }
+        if row.id == get_leaf_node_key(page, self.cell_num) {
+            return ExecuteResult::ExecuteDuplicateKey
+        }
 
         if self.cell_num < num_cells {
             make_room(page, self.cell_num);
         }
+
         set_leaf_node_num_cells(page, num_cells + 1);
-        set_leaf_node_key(page, num_cells, row.id);
+        set_leaf_node_key(page, self.cell_num, row.id);
         row.serialize(self.value());
         return ExecuteResult::ExecuteSuccess;
     }

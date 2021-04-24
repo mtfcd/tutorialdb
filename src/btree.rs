@@ -3,11 +3,6 @@ use std::convert::TryInto;
 use super::table::*;
 
 
-enum NodeType {
-    Iternal,
-    Leaf(Page)
-}
-
 const NODE_TYPE_SIZE: usize = 1;
 const NODE_TYPE_OFFSET: usize = 0;
 const IS_ROOT_SIZE: usize = 1;
@@ -42,6 +37,12 @@ pub fn set_leaf_node_num_cells(page: &mut Page, cell_num: u32) {
     page[idx_1..idx_2].copy_from_slice(&cell_num.to_le_bytes());
 }
 
+pub fn get_leaf_node_key(page: &Page, cell_num: u32) -> u32 {
+    let idx_1 = leaf_node_offset(cell_num) + LEAF_NODE_KEY_OFFSET;
+    let idx_2 = idx_1 + LEAF_NODE_KEY_SIZE;
+
+    u32::from_le_bytes(page[idx_1..idx_2].try_into().unwrap())
+}
 pub fn set_leaf_node_key(page: &mut Page, cell_num: u32, key: u32) {
     let idx_1 = leaf_node_offset(cell_num) + LEAF_NODE_KEY_OFFSET;
     let idx_2 = idx_1 + LEAF_NODE_KEY_SIZE;
@@ -66,6 +67,7 @@ pub fn leaf_node_value(page: &mut Page, cell_num: u32) -> &mut [u8] {
 
 pub fn initialize_leaf_node(page: &mut Page) {
     page.fill(0);
+    set_node_type(page, NodeType::Leaf);
 }
 
 pub fn make_room(page: &mut Page, cell_num: u32) {
@@ -82,4 +84,36 @@ pub fn print_constants() {
     println!("LEAF_NODE_CELL_SIZE: {}", LEAF_NODE_CELL_SIZE);
     println!("LEAF_NODE_SPACE_FOR_CELLS: {}", LEAF_NODE_SPACE_FOR_CELLS);
     println!("LEAF_NODE_MAX_CELLS: {}", LEAF_NODE_MAX_CELLS);
+}
+
+pub enum NodeType {
+    Iternal = 1,
+    Leaf = 2
+}
+impl NodeType {
+    fn from_u8(num: u8) -> Self {
+        match num {
+            1 => NodeType::Iternal,
+            2  => NodeType::Leaf,
+            _ => panic!("unknown node type")
+        }
+    }
+
+    fn to_u8(&self) -> u8 {
+        match self {
+            Self::Iternal => 1,
+            Self::Leaf => 2
+        }
+    }
+}
+pub fn get_node_type(page: &Page) -> NodeType {
+    let idx_1 = NODE_TYPE_OFFSET;
+    let idx_2 = idx_1 + NODE_TYPE_SIZE;
+    let type_value = u8::from_le_bytes(page[idx_1..idx_2].try_into().unwrap());
+    NodeType::from_u8(type_value)
+}
+pub fn set_node_type(page: &mut Page, node_type: NodeType) {
+    let idx_1 = NODE_TYPE_OFFSET;
+    let idx_2 = idx_1 + NODE_TYPE_SIZE;
+    page[idx_1..idx_2].copy_from_slice(&node_type.to_u8().to_le_bytes());
 }
